@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importação em Massa - Zabbix</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <style>
+        .container {
+            max-width: 1200px;
+            margin-top: 30px;
+        }
+        .card {
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .result-success {
+            color: #28a745;
+        }
+        .result-error {
+            color: #dc3545;
+        }
+        .snmp-fields {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+        #test-connection {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">Importação em Massa de Equipamentos - Zabbix</h1>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <button id="test-connection" class="btn btn-info mb-3">
+                    Testar Conexão com Zabbix
+                </button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Importar Hosts</h5>
+            </div>
+            <div class="card-body">
+                <form action="/import" method="post" enctype="multipart/form-data" id="import-form">
+                    <div class="mb-3">
+                        <label for="csv_file" class="form-label">Arquivo CSV</label>
+                        <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
+                        <div class="form-text">
+                            O CSV deve conter as colunas: nome, ip
+                            <br>
+                            Exemplo:
+                            <pre>nome,ip
+servidor01,192.168.1.10
+servidor02,192.168.1.11</pre>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="templates" class="form-label">Templates</label>
+                        <select class="form-select" id="templates" name="templates[]" multiple required>
+                        </select>
+                        <div class="form-text">Selecione um ou mais templates para associar aos hosts</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Versão SNMP</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="snmp_version" id="snmpv2" value="2" checked>
+                            <label class="form-check-label" for="snmpv2">
+                                SNMP v2c
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="snmp_version" id="snmpv3" value="3">
+                            <label class="form-check-label" for="snmpv3">
+                                SNMP v3
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Campos SNMP v2c -->
+                    <div id="snmpv2-fields" class="snmp-fields">
+                        <h6>Configuração SNMP v2c</h6>
+                        <div class="mb-3">
+                            <label for="snmp_community" class="form-label">Community</label>
+                            <input type="text" class="form-control" id="snmp_community" name="snmp_community" value="public">
+                        </div>
+                    </div>
+
+                    <!-- Campos SNMP v3 -->
+                    <div id="snmpv3-fields" class="snmp-fields" style="display: none;">
+                        <h6>Configuração SNMP v3</h6>
+                        
+                        <div class="mb-3">
+                            <label for="snmp_securityname" class="form-label">Security Name</label>
+                            <input type="text" class="form-control" id="snmp_securityname" name="snmp_securityname">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="snmp_securitylevel" class="form-label">Security Level</label>
+                            <select class="form-select" id="snmp_securitylevel" name="snmp_securitylevel">
+                                <option value="0">noAuthNoPriv</option>
+                                <option value="1">authNoPriv</option>
+                                <option value="2">authPriv</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="snmp_authprotocol" class="form-label">Auth Protocol</label>
+                            <select class="form-select" id="snmp_authprotocol" name="snmp_authprotocol">
+                                <option value="0">MD5</option>
+                                <option value="1">SHA</option>
+                                <option value="2">SHA224</option>
+                                <option value="3">SHA256</option>
+                                <option value="4">SHA384</option>
+                                <option value="5">SHA512</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="snmp_authpassphrase" class="form-label">Auth Passphrase</label>
+                            <input type="password" class="form-control" id="snmp_authpassphrase" name="snmp_authpassphrase">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="snmp_privprotocol" class="form-label">Priv Protocol</label>
+                            <select class="form-select" id="snmp_privprotocol" name="snmp_privprotocol">
+                                <option value="0">DES</option>
+                                <option value="1">AES128</option>
+                                <option value="2">AES192</option>
+                                <option value="3">AES256</option>
+                                <option value="4">AES192C</option>
+                                <option value="5">AES256C</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="snmp_privpassphrase" class="form-label">Priv Passphrase</label>
+                            <input type="password" class="form-control" id="snmp_privpassphrase" name="snmp_privpassphrase">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="snmp_contextname" class="form-label">Context Name</label>
+                            <input type="text" class="form-control" id="snmp_contextname" name="snmp_contextname">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Importar Hosts</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Resultados da importação -->
+        {% if results %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">Resultado da Importação</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert {% if error_count > 0 %}alert-warning{% else %}alert-success{% endif %}">
+                    <strong>Resumo:</strong> 
+                    {{ success_count }} hosts importados com sucesso, 
+                    {{ error_count }} hosts com erro
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>IP</th>
+                                <th>Status</th>
+                                <th>Mensagem</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for result in results %}
+                            <tr>
+                                <td>{{ result.nome }}</td>
+                                <td>{{ result.ip }}</td>
+                                <td>
+                                    {% if result.status == 'success' %}
+                                    <span class="badge bg-success">Sucesso</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Erro</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ result.mensagem }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Mensagens Flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show mt-3" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    
+    <script>
+        $(document).ready(function() {
+            // Inicializar Select2
+            $('#templates').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Selecione os templates',
+                allowClear: true,
+                width: '100%',
+                ajax: {
+                    url: '/get_templates',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function(params) {
+                        return {
+                            search: params.term
+                        };
+                    },
+                    processResults: function(data) {
+                        return {
+                            results: data
+                        };
+                    },
+                    cache: true
+                }
+            });
+
+            // Toggle SNMP fields
+            $('input[name="snmp_version"]').change(function() {
+                if ($(this).val() === '2') {
+                    $('#snmpv2-fields').show();
+                    $('#snmpv3-fields').hide();
+                } else {
+                    $('#snmpv2-fields').hide();
+                    $('#snmpv3-fields').show();
+                }
+            });
+
+            // Testar conexão
+            $('#test-connection').click(function() {
+                var btn = $(this);
+                btn.prop('disabled', true).text('Testando...');
+                
+                $.ajax({
+                    url: '/test_connection',
+                    method: 'GET',
+                    success: function(response) {
+                        alert('✅ ' + response.message);
+                    },
+                    error: function(xhr) {
+                        alert('❌ Erro: ' + xhr.responseJSON.message);
+                    },
+                    complete: function() {
+                        btn.prop('disabled', false).text('Testar Conexão com Zabbix');
+                    }
+                });
+            });
+
+            // Validar formulário antes de enviar
+            $('#import-form').submit(function(e) {
+                var templates = $('#templates').val();
+                if (!templates || templates.length === 0) {
+                    e.preventDefault();
+                    alert('Por favor, selecione pelo menos um template');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
